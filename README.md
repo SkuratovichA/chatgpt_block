@@ -25,7 +25,7 @@ The package provides the solution to this by simply counting the length of the h
 ## Installation
 
 ### Install Locally
-1. `git clone https://github.com/SkuratovichA/chagpt_block`
+1. `git clone https://github.com/SkuratovichA/chatgpt_block`
 2. `cd chatgpt_block`
 2. `pip install -e .`
 
