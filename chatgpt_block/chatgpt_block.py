@@ -53,7 +53,8 @@ class ChatGPTBlock:
             stream: bool = False,
             temperature=0.001,  # high temperature makes the output more unstable and unpredictable
             preprocessor=lambda text: text,
-            on_error=lambda: None
+            on_error=lambda: None,
+            raise_on_errors=False
     ):
         """
            Initializes a new instance of the ChatGPTBlock class.
@@ -68,6 +69,7 @@ class ChatGPTBlock:
                temperature (float, optional): Controls the randomness of the output. Defaults to 0.001.
                preprocessor (callable, optional): A function to preprocess user input. Defaults to the identity text -> text function
                on_error (callable, optional): A function to handle errors. Defaults to an empty function.
+               raise_on_errors (bool, optional). Whether raise an exception on OpenAI API error. Defaults to False.
            """
         max_tokens_by_model = {
             'gpt-3.5-turbo': 4097,
@@ -107,6 +109,7 @@ class ChatGPTBlock:
         self.preprocessor = preprocessor
         self._answer = ""
         self.on_error = on_error
+        self.raise_on_error = raise_on_errors
 
     @property
     def history_length(self) -> int:
@@ -201,13 +204,17 @@ class ChatGPTBlock:
             )
             response = openai_api_response
         except openai.error.OpenAIError as e:
-            logger.info(f'Error handled: {e}')
             self.on_error()
-            response = SimpleStringIterator(f"OpenAI internal error. {e}")
+            if self.raise_on_error:
+                raise e
+            errmsg = f"OpenAI internal error. {e}"
+            response = SimpleStringIterator(errmsg) if self.stream else errmsg
         except Exception as e:
-            logger.info(f'Error handled: {e}')
             self.on_error()
-            response = SimpleStringIterator(f"Internal error. {e}")
+            if self.raise_on_error:
+                raise e
+            errmsg = f"Internal error. {e}"
+            response = SimpleStringIterator(errmsg) if self.stream else errmsg
         end = datetime.now()
         time_elapsed = compute_time_elapsed(start, end)
         logger.debug(f'time waiting for api: {time_elapsed:.3f}')
