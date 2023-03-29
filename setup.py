@@ -8,7 +8,7 @@ def read_file(filename):
 
 setup(
     name='chatgpt_block',
-    version='0.1.2.1',
+    version='0.1.3',
     packages=find_packages(),
     install_requires=[
         'openai>=0.27.2',

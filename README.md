@@ -39,45 +39,58 @@ The package provides the solution to this by simply counting the length of the h
 Here's an example of how to use the ChatGPTBlock class:
 There are two options of using the class. Streamable and non-streamable.
 
+## Non-Streamable Mode
 ```python
 from chatgpt_block import ChatGPTBlock
 
 # Initialize the ChatGPTBlock instance
-chatgpt_block = ChatGPTBlock(
+chat_gpt_block = ChatGPTBlock(
     system_prompt="You are a helpful assistant.",
-    openai_api_token="your_openai_api_key",
+    openai_api_key="your_openai_api_key",
     model="gpt-4",
+    preprocessor=lambda x: x,
 )
 
 # Get a response from the model
-response = chatgpt_block("Tell me a joke.")
+response = chat_gpt_block("Tell me a joke.")
 print(response)
 ```
     
+## Streamable Mode
 ```python
 from chatgpt_block import ChatGPTBlock
 
-chatgpt_block = ChatGPTBlock(
+chat_gpt_block = ChatGPTBlock(
     system_prompt="You are a helpful assistant.",
-    openai_api_token="your_openai_api_key",
+    openai_api_key="your_openai_api_key",
     model="gpt-4",
-    stream=True
+    stream=True,
+    preprocessor=lambda x: x,
 )
 
-generator = chatgpt_block("Tell me a joke.")
+generator = chat_gpt_block("Tell me a joke.")
 for token in generator:
     print(token, flush=True, end='')
 ```
 
 ### Resetting The Conversation
-
 ```python
-chatgpt_block("Tell me a joke.")
-print(chatgpt_block.answer)
+from chatgpt_block import ChatGPTBlock
 
-chatgpt_block.reset()
+chat_gpt_block = ChatGPTBlock(
+    system_prompt="You are a helpful assistant.",
+    openai_api_key="your_openai_api_key",
+    model="gpt-4",
+    stream=True,
+    preprocessor=lambda x: x,
+)
 
-response = chatgpt_block("Tell me a story.")
+chat_gpt_block("Tell me a joke.")
+print(chat_gpt_block.answer)
+
+chat_gpt_block.reset()
+
+response = chat_gpt_block("Tell me a story.")
 print(response)
 ```
 
@@ -88,14 +101,14 @@ from chatgpt_block import ChatGPTBlock
 def custom_preprocessor(input_text: str, some_dictionary: dict, prologue: str) -> str:
     return f"{prologue}\n{input_text}. {some_dictionary}"
 
-chatgpt_block = ChatGPTBlock(
+chat_gpt_block = ChatGPTBlock(
     system_prompt="You are a helpful assistant.",
-    openai_api_token="your_openai_api_key",
+    openai_api_key="your_openai_api_key",
     model="gpt-4",
     preprocessor=custom_preprocessor,
 )
 
-response = chatgpt_block(
+response = chat_gpt_block(
     input_text="please check whether this python dictionary is valid", 
     some_dictionary={"hello": "world"}, prologue=''
 )
@@ -109,14 +122,15 @@ from chatgpt_block import ChatGPTBlock
 def custom_error_handler():
     print("There was an error when communicating with OpenAI API. Please try again later")
 
-chatgpt_block = ChatGPTBlock(
+chat_gpt_block = ChatGPTBlock(
     system_prompt="You are a helpful assistant.",
-    openai_api_token="your_openai_api_key",
+    openai_api_key="your_openai_api_key",
     model="gpt-4",
     on_error=custom_error_handler,
+    preprocessor=lambda x: x,
 )
 
-response = chatgpt_block("tell me a joke")
+response = chat_gpt_block("tell me a joke")
 print(response)
 ```
 
@@ -131,20 +145,59 @@ examples = [
      "Cat + Cappuccino = cappucicatto"),
 ]
 
-chatgpt_block = ChatGPTBlock(
+chat_gpt_block = ChatGPTBlock(
     system_prompt=
     """You are a helpful assistant with a sense of humor. 
        You know everything about animals, vegetables and how to combine them. 
        You must add animals to vegetables no matter what to create funny words.
     """,
     examples=examples,
-    openai_api_token="your_openai_api_key",
+    openai_api_key="your_openai_api_key",
     model="gpt-4",
+    preprocessor=lambda x: x,
 )
 
-response = chatgpt_block("Make up some new word with \"tortoise\"")
+response = chat_gpt_block("Make up some new word with \"tortoise\"")
 print(response)
 ```
+
+## Silent Errors    
+```python
+from chatgpt_block import ChatGPTBlock
+
+# Initialize the ChatGPTBlock instance
+chat_gpt_block = ChatGPTBlock(
+    system_prompt="wrong key",
+    openai_api_key="your_openai_api_key",
+    model="gpt-4",
+    preprocessor=lambda x: x,
+    raise_on_error=False,
+)
+
+# Get a response from the model
+response = chat_gpt_block("Tell me a joke.")
+print(response)  # OpenAI internal error. No API key provided. You can ...
+```
+
+## Errors as Exceptions    
+```python
+from chatgpt_block import ChatGPTBlock
+
+# Initialize the ChatGPTBlock instance
+chat_gpt_block = ChatGPTBlock(
+    system_prompt="wrong key",
+    openai_api_key="your_openai_api_key",
+    model="gpt-4",
+    preprocessor=lambda x: x,
+    raise_on_error=True,
+)
+
+# Get a response from the model
+response = chat_gpt_block("Tell me a joke.")
+# AuthenticationError: No API key provided ...
+```
+
+
 
 ## Contributing
 This package is free to any ideas. Just create an issue or a pull request on GitHub.

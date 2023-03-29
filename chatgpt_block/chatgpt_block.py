@@ -40,21 +40,28 @@ class SimpleStringIterator:
 
 
 class ChatGPTBlock:
+    max_tokens_by_model = {
+        'gpt-3.5-turbo': 4097,
+        'gpt-3.5-turbo-0301': 4097,
+        'gpt-4': 8192,
+        'gpt-4-0314': 8192,
+    }
+
     """
     A class for interacting with OpenAI's chat model through the API.
     """
     def __init__(
             self,
             system_prompt: str,
+            preprocessor: callable,
             examples: Union[None, List[Tuple[Union[str, dict], Union[str, dict]]]] = None,
-            openai_api_token: Union[str, None] = None,
+            openai_api_key: Union[str, None] = None,
             model: str = 'gpt-4',
             max_output_length: int = 400,
             stream: bool = False,
-            temperature=0.001,  # high temperature makes the output more unstable and unpredictable
-            preprocessor=lambda text: text,
+            temperature=0.001,
             on_error=lambda: None,
-            raise_on_errors=False
+            raise_on_error=True
     ):
         """
            Initializes a new instance of the ChatGPTBlock class.
@@ -62,34 +69,28 @@ class ChatGPTBlock:
            Args:
                system_prompt (str): The system prompt used to guide the conversation.
                examples (Union[None, List[Tuple[Union[str, dict], Union[str, dict]]]], optional): A list of example input-output pairs.
-               openai_api_token (Union[str, None], optional): The OpenAI API token. Defaults to None.
+               openai_api_key (Union[str, None], optional): The OpenAI API token. Defaults to None.
                model (str, optional): The GPT model to use. Defaults to 'gpt-4'.
                max_output_length (int, optional): The maximum number of tokens in the generated output. Defaults to 400.
                stream (bool, optional): Whether to use streaming mode. Defaults to True.
                temperature (float, optional): Controls the randomness of the output. Defaults to 0.001.
-               preprocessor (callable, optional): A function to preprocess user input. Defaults to the identity text -> text function
+               preprocessor (callable): A function to preprocess user input. Defaults to the identity text -> text function
                on_error (callable, optional): A function to handle errors. Defaults to an empty function.
-               raise_on_errors (bool, optional). Whether raise an exception on OpenAI API error. Defaults to False.
+               raise_on_error (bool, optional). Whether raise an exception on OpenAI API error. Defaults to False.
            """
-        max_tokens_by_model = {
-            'gpt-3.5-turbo': 4097,
-            'gpt-3.5-turbo-0301': 4097,
-            'gpt-4': 8192,
-            'gpt-4-0314': 8192,
-        }
-        models = list(max_tokens_by_model.keys())
+        models = list(self.max_tokens_by_model.keys())
         if model not in models:
             raise KeyError(f'{model} must be in {models}')
         self.stream = stream
         self.model = model
-        self.tokens_available = max_tokens_by_model[self.model]
+        self.tokens_available = self.max_tokens_by_model[self.model]
         self.max_output_length = max_output_length
         self.temperature = temperature
         if self.tokens_available < self.max_output_length:
             raise ValueError(
                 f'{max_output_length} must be less than max_tokens given by a model. Current: {max_output_length} > {self.tokens_available}')
 
-        openai.api_key = os.getenv('OPENAI_API_KEY') or openai_api_token
+        openai.api_key = os.getenv('OPENAI_API_KEY') or openai_api_key
 
         self.system_prompt = {"role": "system", "content": system_prompt}
         self.initial_examples = [
@@ -109,7 +110,7 @@ class ChatGPTBlock:
         self.preprocessor = preprocessor
         self._answer = ""
         self.on_error = on_error
-        self.raise_on_error = raise_on_errors
+        self.raise_on_error = raise_on_error
 
     @property
     def history_length(self) -> int:
@@ -174,14 +175,14 @@ class ChatGPTBlock:
             index = trimmed_history.index(user_element)
             trimmed_history = trimmed_history[index + 1:]
 
-            new_length = sum(self.get_number_of_tokens(el) for el in trimmed_history)
+            new_length = self.get_number_of_tokens(trimmed_history)
             logger.info(
                 f'history trimmed. New length: {new_length}. Available length: {total_tokens}'
             )
 
         return trimmed_history
 
-    def call_raw_api(self) -> Union[SimpleStringIterator, GeneratorType, OpenAIObject]:
+    def call_raw_api(self) -> Union[SimpleStringIterator, GeneratorType, OpenAIObject, str]:
         """
         Calls the OpenAI API and returns the raw response.
 
@@ -190,6 +191,7 @@ class ChatGPTBlock:
         """
 
         start = datetime.now()
+        exception = None
         try:
             openai_api_response = openai.ChatCompletion.create(
                 model=self.model,
@@ -205,16 +207,16 @@ class ChatGPTBlock:
             response = openai_api_response
         except openai.error.OpenAIError as e:
             self.on_error()
-            if self.raise_on_error:
-                raise e
+            exception = e
             errmsg = f"OpenAI internal error. {e}"
             response = SimpleStringIterator(errmsg) if self.stream else errmsg
         except Exception as e:
             self.on_error()
-            if self.raise_on_error:
-                raise e
+            exception = e
             errmsg = f"Internal error. {e}"
             response = SimpleStringIterator(errmsg) if self.stream else errmsg
+        if self.raise_on_error and exception is not None:
+            raise exception
         end = datetime.now()
         time_elapsed = compute_time_elapsed(start, end)
         logger.debug(f'time waiting for api: {time_elapsed:.3f}')
@@ -284,6 +286,8 @@ class ChatGPTBlock:
             return self.generator_wrapper(openai_api_response)
         elif isinstance(openai_api_response, OpenAIObject):
             return self.process_response(openai_api_response)
+        elif isinstance(openai_api_response, str):
+            return openai_api_response
         else:
             raise ValueError(f"openAI response has an unknown type: {type(openai_api_response)}")
 
