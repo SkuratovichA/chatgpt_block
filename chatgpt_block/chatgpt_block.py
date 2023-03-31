@@ -245,7 +245,6 @@ class ChatGPTBlock:
                 self._answer = chunk['message']['content']
                 final_answer = self._answer
             self.history.append({"role": "assistant", "content": self._answer})
-            self._answer = ""
             return final_answer
         else:
             logger.info(f'finish_reason: {finish_reason}')
@@ -305,6 +304,7 @@ class ChatGPTBlock:
         request = self.preprocessor(*args, **kwargs)
         self.history.append({"role": "user", "content": request})
         self.history = self.get_trimmed_history()
+        self._answer = ''
         return self.api_answer_wrapper()
 
     def reset(self):
