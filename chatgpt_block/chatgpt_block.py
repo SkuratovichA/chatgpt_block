@@ -120,9 +120,11 @@ class ChatGPTBlock:
         examples_len = _(" ".join([x["content"] for x in self.initial_examples]))
         self.tokens_available -= (system_prompt_len + examples_len)
         self.preprocessor = preprocessor
-        self._answer = ""
         self.on_error = on_error
         self.raise_on_error = raise_on_error
+
+        self._answer = ""
+        self._request = ''
 
     @property
     def history_length(self) -> int:
@@ -143,6 +145,16 @@ class ChatGPTBlock:
             str: The generated answer.
         """
         return self._answer
+
+    @property
+    def request(self) -> str:
+        """
+        Returns the question user asks.
+
+        Returns:
+            str: The question user asks.
+        """
+        return self._request
 
     def get_number_of_tokens(self, input: Union[str, dict, list]) -> int:
         """
@@ -316,13 +328,12 @@ class ChatGPTBlock:
                 Union[SimpleStringIterator, GeneratorType, str]: The generated response.
         """
         request = self.preprocessor(*args, **kwargs)
-        if not request:
-            return ''
+        self._request = request
 
         self.history = self.get_trimmed_history(
             total_tokens=min(self.tokens_available - self.max_output_length - len(request), self.max_history_length_tokens)
         )
-        self.history.append({"role": "user", "content": request})
+        self.history.append({"role": "user", "content": self._request})
 
         self._answer = ''
         return self.api_answer_wrapper()
