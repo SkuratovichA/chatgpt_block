@@ -163,14 +163,13 @@ class ChatGPTBlock:
         else:
             raise NotImplementedError
 
-    def get_trimmed_history(self) -> List:
+    def get_trimmed_history(self, total_tokens) -> List:
         """
         Trims the conversation history to fit within the token limit.
 
         Returns:
             list: The trimmed conversation history.
         """
-        total_tokens = min(self.tokens_available - self.max_output_length, self.max_history_length_tokens)
         trimmed_history = []
         tokens_count = 0
         user_element = None
@@ -211,7 +210,7 @@ class ChatGPTBlock:
             openai_api_response = openai.ChatCompletion.create(
                 model=self.model,
                 stream=self.stream,
-                # max_tokens=self.max_output_length,
+                max_tokens=self.max_output_length,
                 temperature=self.temperature,
                 messages=[
                     self.system_prompt,
@@ -317,8 +316,14 @@ class ChatGPTBlock:
                 Union[SimpleStringIterator, GeneratorType, str]: The generated response.
         """
         request = self.preprocessor(*args, **kwargs)
+        if not request:
+            return ''
+
+        self.history = self.get_trimmed_history(
+            total_tokens=min(self.tokens_available - self.max_output_length - len(request), self.max_history_length_tokens)
+        )
         self.history.append({"role": "user", "content": request})
-        self.history = self.get_trimmed_history()
+
         self._answer = ''
         return self.api_answer_wrapper()
 
