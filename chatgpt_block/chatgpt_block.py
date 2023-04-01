@@ -84,17 +84,11 @@ class ChatGPTBlock:
                 That's why you can set this parameter to limit the history length. The length of 2.5k token is a good start for conversations.
                 If the parameter is not specified, max_history_length_tokens will be set to the max length of the model.
            """
-        models = list(self.max_tokens_by_model.keys())
-        if model not in models:
-            raise KeyError(f'{model} must be in {models}')
-        if max_history_length_tokens and max_history_length_tokens > self.max_tokens_by_model[model]:
-            raise ValueError(
-                'Parameter max_history_length_tokens should be less than max_tokens for a model.\n'
-                f'Current: {max_history_length_tokens} > {self.max_tokens_by_model[model]}'
-            )
-        self.max_history_length_tokens = max_history_length_tokens or self.max_tokens_by_model[model]
-        self.stream = stream
+        self._check_if_model_exists(model)
         self.model = model
+        self._check_max_history_length(max_history_length_tokens)
+        self.max_history_length_tokens = max_history_length_tokens or self.max_tokens_by_model[self.model]
+        self.stream = stream
         self.tokens_available = self.max_tokens_by_model[self.model]
         self.max_output_length = max_output_length
         self.temperature = temperature
@@ -125,6 +119,22 @@ class ChatGPTBlock:
 
         self._answer = ""
         self._request = ''
+
+    def _check_max_history_length(self, max_history_length_tokens):
+        if max_history_length_tokens and max_history_length_tokens > self.max_tokens_by_model[self.model]:
+            raise ValueError(
+                'Parameter max_history_length_tokens should be less than max_tokens for a model.\n'
+                f'Current: {max_history_length_tokens} > {self.max_tokens_by_model[self.model]}'
+            )
+
+    def _check_if_model_exists(self, model):
+        models = list(self.max_tokens_by_model.keys())
+        if model not in models:
+            raise KeyError(f'{model} must be in {models}')
+
+    def set_model(self, new_model):
+        self.tokens_available -= (self.max_tokens_by_model[self.model] - self.max_tokens_by_model[new_model])
+        self.model = new_model
 
     @property
     def history_length(self) -> int:
