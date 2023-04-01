@@ -50,6 +50,7 @@ class ChatGPTBlock:
     """
     A class for interacting with OpenAI's chat model through the API.
     """
+
     def __init__(
             self,
             system_prompt: str,
@@ -61,7 +62,8 @@ class ChatGPTBlock:
             stream: bool = False,
             temperature=0.001,
             on_error=lambda: None,
-            raise_on_error=True
+            raise_on_error=True,
+            max_history_length_tokens: Union[int, None] = None,
     ):
         """
            Initializes a new instance of the ChatGPTBlock class.
@@ -76,11 +78,21 @@ class ChatGPTBlock:
                temperature (float, optional): Controls the randomness of the output. Defaults to 0.001.
                preprocessor (callable): A function to preprocess user input. Defaults to the identity text -> text function
                on_error (callable, optional): A function to handle errors. Defaults to an empty function.
-               raise_on_error (bool, optional). Whether raise an exception on OpenAI API error. Defaults to False.
+               raise_on_error (bool, optional): Whether raise an exception on OpenAI API error. Defaults to False.
+               max_history_length_tokens (Union[int, None], optional): Max history length.
+                Since the length of the history of the particular model could be up to 32k tokens, it could be too expensive (and probably slow) to store the whole history.
+                That's why you can set this parameter to limit the history length. The length of 2.5k token is a good start for conversations.
+                If the parameter is not specified, max_history_length_tokens will be set to the max length of the model.
            """
         models = list(self.max_tokens_by_model.keys())
         if model not in models:
             raise KeyError(f'{model} must be in {models}')
+        if max_history_length_tokens and max_history_length_tokens > self.max_tokens_by_model[model]:
+            raise ValueError(
+                'Parameter max_history_length_tokens should be less than max_tokens for a model.\n'
+                f'Current: {max_history_length_tokens} > {self.max_tokens_by_model[model]}'
+            )
+        self.max_history_length_tokens = max_history_length_tokens or self.max_tokens_by_model[model]
         self.stream = stream
         self.model = model
         self.tokens_available = self.max_tokens_by_model[self.model]
@@ -158,7 +170,7 @@ class ChatGPTBlock:
         Returns:
             list: The trimmed conversation history.
         """
-        total_tokens = self.tokens_available - self.max_output_length
+        total_tokens = min(self.tokens_available - self.max_output_length, self.max_history_length_tokens)
         trimmed_history = []
         tokens_count = 0
         user_element = None
@@ -181,6 +193,9 @@ class ChatGPTBlock:
             )
 
         return trimmed_history
+
+    def set_system_prompt(self, new_system_prompt):
+        self.system_prompt = {"role": "system", "content": new_system_prompt}
 
     def call_raw_api(self) -> Union[SimpleStringIterator, GeneratorType, OpenAIObject, str]:
         """
