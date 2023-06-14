@@ -41,10 +41,14 @@ class SimpleStringIterator:
 
 class ChatGPTBlock:
     max_tokens_by_model = {
-        'gpt-3.5-turbo': 4097,
-        'gpt-3.5-turbo-0301': 4097,
-        'gpt-4': 8192,
-        'gpt-4-0314': 8192,
+        'gpt-3.5-turbo': 4096,
+        'gpt-3.5-turbo-0301':4096,
+        'gpt-3.5-turbo-0613': 4096,
+        'gpt-3.5-turbo-16k': 16384,
+        'gpt-3.5-turbo-16k-0613': 16384,
+        'gpt-4': 8096,
+        'gpt-4-0314': 8096,
+        'gpt-4-0613': 8096
     }
 
     """
